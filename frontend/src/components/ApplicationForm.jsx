@@ -34,6 +34,7 @@ const ApplicationForm = () => {
     mothersContact: "",
     documents: [],
     agreement: false,
+    hasPostgraduate: "No", // New field for postgraduate completion status
   });
 
   const [previousFormData, setPreviousFormData] = useState({
@@ -93,73 +94,76 @@ const ApplicationForm = () => {
   };
 
   useEffect(() => {
-    const fetchFormStructure = async () => {
-      try {
-        const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/forms/get-form-structure/${courseId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
-        setFormStructure({
-          programType: response.data.programType || "PG",
-          requiredAcademicFields: response.data.requiredAcademicFields || [],
-          requiredAcademicSubfields: response.data.requiredAcademicSubfields || {
-            tenth: { percentage: false, yearOfPassing: false, board: false, schoolName: false, customFields: [] },
-            twelth: { percentage: false, yearOfPassing: false, board: false, schoolName: false, customFields: [] },
-            graduation: { percentage: false, yearOfPassing: false, university: false, collegeName: false, customFields: [] },
-            postgraduate: { percentage: false, yearOfPassing: false, university: false, collegeName: false, customFields: [] },
-          },
-          requiredDocuments: response.data.requiredDocuments || [],
-        });
-      } catch (error) {
-        console.error("Error fetching form structure:", error);
-        showPopup("Error fetching form structure. Defaulting to PG.", "error");
-      }
-    };
-
-    const fetchDraftApplication = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const studentId = localStorage.getItem("userId");
-        if (!token || !studentId) {
-          showPopup("Please log in to continue.", "error");
-          return;
-        }
-        const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/applications/get-application/${studentId}/${courseId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        if (response.data && response.data.status === "draft") {
-          setFormData(response.data.formData);
-          setEducationDetails(response.data.educationDetails);
-          setActiveIndex(response.data.lastActiveSection || 0);
-          setCompletedSections(
-            sections.reduce((acc, _, idx) => {
-              if (idx < response.data.lastActiveSection) acc[idx] = true;
-              return acc;
-            }, {})
-          );
-          setSavedSections(
-            sections.reduce((acc, _, idx) => {
-              if (idx <= response.data.lastActiveSection) acc[idx] = true;
-              return acc;
-            }, {})
-          );
-          showPopup("Resumed your saved application.", "success");
-        }
-      } catch (error) {
-        if (error.response?.status !== 404) {
-          console.error("Error fetching draft application:", error);
-          showPopup("Error loading saved application.", "error");
-        }
-      }
-    };
-
-    if (courseId) {
-      fetchFormStructure();
-      fetchDraftApplication();
+  const fetchFormStructure = async () => {
+    try {
+      const response = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/forms/get-form-structure/${courseId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      setFormStructure({
+        programType: response.data.programType || "PG",
+        requiredAcademicFields: response.data.requiredAcademicFields || [],
+        requiredAcademicSubfields: response.data.requiredAcademicSubfields || {
+          tenth: { percentage: false, yearOfPassing: false, board: false, schoolName: false, customFields: [] },
+          twelth: { percentage: false, yearOfPassing: false, board: false, schoolName: false, customFields: [] },
+          graduation: { percentage: false, yearOfPassing: false, university: false, collegeName: false, customFields: [] },
+          postgraduate: { percentage: false, yearOfPassing: false, university: false, collegeName: false, customFields: [] },
+        },
+        requiredDocuments: response.data.requiredDocuments || [],
+      });
+    } catch (error) {
+      console.error("Error fetching form structure:", error);
+      showPopup("Error fetching form structure. Defaulting to PG.", "error");
     }
-  }, [courseId]);
+  };
+
+  const fetchDraftApplication = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const studentId = localStorage.getItem("userId");
+      if (!token || !studentId) {
+        showPopup("Please log in to continue.", "error");
+        return;
+      }
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/applications/get-application/${studentId}/${courseId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (response.data && response.data.status === "draft") {
+        setFormData({
+          ...response.data.formData,
+          hasPostgraduate: response.data.formData.hasPostgraduate || "No", // Ensure hasPostgraduate is set
+        });
+        setEducationDetails(response.data.educationDetails);
+        setActiveIndex(response.data.lastActiveSection || 0);
+        setCompletedSections(
+          sections.reduce((acc, _, idx) => {
+            if (idx < response.data.lastActiveSection) acc[idx] = true;
+            return acc;
+          }, {})
+        );
+        setSavedSections(
+          sections.reduce((acc, _, idx) => {
+            if (idx <= response.data.lastActiveSection) acc[idx] = true;
+            return acc;
+          }, {})
+        );
+        showPopup("Resumed your saved application.", "success");
+      }
+    } catch (error) {
+      if (error.response?.status !== 404) {
+        console.error("Error fetching draft application:", error);
+        showPopup("Error loading saved application.", "error");
+      }
+    }
+  };
+
+  if (courseId) {
+    fetchFormStructure();
+    fetchDraftApplication();
+  }
+}, [courseId]);
 
   const handleSave = async () => {
     try {
@@ -209,98 +213,103 @@ const ApplicationForm = () => {
   };
 
   const handleSubmit = async () => {
-    if (validateSection()) {
-      if (!formData.aadhaarNumber || !/^\d{12}$/.test(formData.aadhaarNumber)) {
-        setErrors((prev) => ({
-          ...prev,
-          aadhaarNumber: "Valid 12-digit Aadhaar number is required",
-        }));
-        showPopup("Please enter a valid Aadhaar number.", "error");
-        return;
-      }
-      if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) {
-        setErrors((prev) => ({
-          ...prev,
-          email: "Valid email is required",
-        }));
-        showPopup("Please enter a valid email address.", "error");
-        return;
-      }
-
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          showPopup("Please log in to submit the application.", "error");
-          return;
-        }
-        if (!token.match(/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/)) {
-          showPopup("Invalid token format. Please log in again.", "error");
-          localStorage.removeItem("token");
-          return;
-        }
-        console.log("Token (redacted):", token.slice(0, 10) + "...");
-
-        const studentId = localStorage.getItem("userId");
-        if (!studentId) {
-          showPopup("User ID not found. Please log in again.", "error");
-          return;
-        }
-
-        const validDocuments = formData.documents.filter(doc => doc.type && doc.file && doc.file instanceof File && doc.file.size > 0);
-        if (validDocuments.length === 0) {
-          showPopup("Please upload at least one valid document file.", "error");
-          return;
-        }
-        if (validDocuments.length !== formStructure.requiredDocuments.length) {
-          showPopup(`Please upload exactly ${formStructure.requiredDocuments.length} required documents.`, "error");
-          return;
-        }
-
-        const submissionData = new FormData();
-        submissionData.append("courseId", courseId);
-        submissionData.append("studentId", studentId);
-        submissionData.append("formData", JSON.stringify({
-          ...formData,
-          documents: validDocuments.map(doc => ({ type: doc.type })),
-        }));
-        submissionData.append("educationDetails", JSON.stringify(educationDetails));
-        submissionData.append("programType", formStructure.programType);
-
-        validDocuments.forEach((doc) => {
-          submissionData.append("documents", doc.file);
-        });
-
-        console.log("Submitting FormData:");
-        for (let [key, value] of submissionData.entries()) {
-          console.log(`${key}:`, value);
-        }
-
-        const response = await axios.post(
-          `${import.meta.env.VITE_BACKEND_URL}/api/applications/submit-application`,
-          submissionData,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
-
-        setPreviousFormData({ ...formData, educationDetails });
-        showPopup("Form saved successfully", "success"); // Consistent success message
-      } catch (error) {
-        console.error("Error submitting application:", error);
-        let errorMessage = error.response?.data?.message || error.response?.data?.error || `Failed to submit application: ${error.message}`;
-        if (error.response?.status === 401) {
-          errorMessage = "Session expired. Please log in again.";
-          localStorage.removeItem("token");
-        }
-        showPopup(errorMessage, "error");
-      }
-    } else {
-      showPopup("Please fix the errors in the form before submitting.", "error");
+  if (validateSection()) {
+    if (!formData.aadhaarNumber || !/^\d{12}$/.test(formData.aadhaarNumber)) {
+      setErrors((prev) => ({
+        ...prev,
+        aadhaarNumber: "Valid 12-digit Aadhaar number is required",
+      }));
+      showPopup("Please enter a valid Aadhaar number.", "error");
+      return;
     }
-  };
+    if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) {
+      setErrors((prev) => ({
+        ...prev,
+        email: "Valid email is required",
+      }));
+      showPopup("Please enter a valid email address.", "error");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        showPopup("Please log in to submit the application.", "error");
+        return;
+      }
+      if (!token.match(/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/)) {
+        showPopup("Invalid token format. Please log in again.", "error");
+        localStorage.removeItem("token");
+        return;
+      }
+      console.log("Token (redacted):", token.slice(0, 10) + "...");
+
+      const studentId = localStorage.getItem("userId");
+      if (!studentId) {
+        showPopup("User ID not found. Please log in again.", "error");
+        return;
+      }
+
+      const validDocuments = formData.documents.filter(doc => doc.type && doc.file && doc.file instanceof File && doc.file.size > 0);
+      if (validDocuments.length === 0) {
+        showPopup("Please upload at least one valid document file.", "error");
+        return;
+      }
+
+      const requiredDocs = formData.hasPostgraduate === "Yes"
+        ? formStructure.requiredDocuments
+        : formStructure.requiredDocuments.filter(doc => doc !== "Postgraduate Marksheet");
+
+      if (validDocuments.length !== requiredDocs.length) {
+        showPopup(`Please upload exactly ${requiredDocs.length} required documents.`, "error");
+        return;
+      }
+
+      const submissionData = new FormData();
+      submissionData.append("courseId", courseId);
+      submissionData.append("studentId", studentId);
+      submissionData.append("formData", JSON.stringify({
+        ...formData,
+        documents: validDocuments.map(doc => ({ type: doc.type })),
+      }));
+      submissionData.append("educationDetails", JSON.stringify(educationDetails));
+      submissionData.append("programType", formStructure.programType);
+
+      validDocuments.forEach((doc) => {
+        submissionData.append("documents", doc.file);
+      });
+
+      console.log("Submitting FormData:");
+      for (let [key, value] of submissionData.entries()) {
+        console.log(`${key}:`, value);
+      }
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/applications/submit-application`,
+        submissionData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      setPreviousFormData({ ...formData, educationDetails });
+      showPopup("Form saved successfully", "success");
+    } catch (error) {
+      console.error("Error submitting application:", error);
+      let errorMessage = error.response?.data?.message || error.response?.data?.error || `Failed to submit application: ${error.message}`;
+      if (error.response?.status === 401) {
+        errorMessage = "Session expired. Please log in again.";
+        localStorage.removeItem("token");
+      }
+      showPopup(errorMessage, "error");
+    }
+  } else {
+    showPopup("Please fix the errors in the form before submitting.", "error");
+  }
+};
 
   const handleSectionClick = (index) => {
     if (index <= activeIndex || completedSections[index - 1] || completedSections[index]) {
@@ -313,115 +322,121 @@ const ApplicationForm = () => {
   };
 
   const validateSection = () => {
-    const sectionErrors = {};
-    switch (activeIndex) {
-      case 0:
-        if (!formData.fullName) sectionErrors.fullName = "Full name is required";
-        if (!formData.dob) sectionErrors.dob = "Date of birth is required";
-        if (!formData.gender) sectionErrors.gender = "Gender is required";
-        if (!formData.nationality) sectionErrors.nationality = "Nationality is required";
-        if (!formData.aadhaarNumber || !/^\d{12}$/.test(formData.aadhaarNumber))
-          sectionErrors.aadhaarNumber = "Valid 12-digit Aadhaar number is required";
-        break;
-      case 1:
-        if (!formData.phoneNumber || !/^((\+91|0)?[0-9]{10})$/.test(formData.phoneNumber.replace(/\s/g, "")))
-          sectionErrors.phoneNumber = "Valid 10-digit phone number is required";
-        if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email))
-          sectionErrors.email = "Valid email is required";
-        if (formData.alternateEmail && !/\S+@\S+\.\S+/.test(formData.alternateEmail))
-          sectionErrors.alternateEmail = "Valid alternate email is required";
-        if (!formData.currentAddress) sectionErrors.currentAddress = "Current address is required";
-        if (!formData.permanentAddress) sectionErrors.permanentAddress = "Permanent address is required";
-        if (!formData.emergencyContact || !/^((\+91|0)?[0-9]{10})$/.test(formData.emergencyContact.replace(/\s/g, "")))
-          sectionErrors.emergencyContact = "Valid 10-digit emergency contact is required";
-        break;
-      case 2:
-        if (!formData.fathersName) sectionErrors.fathersName = "Father's name is required";
-        if (!formData.mothersName) sectionErrors.mothersName = "Mother's name is required";
-        if (!formData.fathersOccupation) sectionErrors.fathersOccupation = "Father's occupation is required";
-        if (!formData.mothersOccupation) sectionErrors.mothersOccupation = "Mother's occupation is required";
-        if (!formData.fathersContact || !/^((\+91|0)?[0-9]{10})$/.test(formData.fathersContact.replace(/\s/g, "")))
-          sectionErrors.fathersContact = "Valid 10-digit father's contact is required";
-        if (!formData.mothersContact || !/^((\+91|0)?[0-9]{10})$/.test(formData.mothersContact.replace(/\s/g, "")))
-          sectionErrors.mothersContact = "Valid 10-digit mother's contact is required";
-        break;
-      case 3:
-        const academicErrors = [];
-        formStructure.requiredAcademicFields.forEach((level) => {
-          if (educationDetails[level].length === 0) {
-            academicErrors.push(`Please provide details for ${level.charAt(0).toUpperCase() + level.slice(1)}.`);
+  const sectionErrors = {};
+  switch (activeIndex) {
+    case 0:
+      if (!formData.fullName) sectionErrors.fullName = "Full name is required";
+      if (!formData.dob) sectionErrors.dob = "Date of birth is required";
+      if (!formData.gender) sectionErrors.gender = "Gender is required";
+      if (!formData.nationality) sectionErrors.nationality = "Nationality is required";
+      if (!formData.aadhaarNumber || !/^\d{12}$/.test(formData.aadhaarNumber))
+        sectionErrors.aadhaarNumber = "Valid 12-digit Aadhaar number is required";
+      break;
+    case 1:
+      if (!formData.phoneNumber || !/^((\+91|0)?[0-9]{10})$/.test(formData.phoneNumber.replace(/\s/g, "")))
+        sectionErrors.phoneNumber = "Valid 10-digit phone number is required";
+      if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email))
+        sectionErrors.email = "Valid email is required";
+      if (formData.alternateEmail && !/\S+@\S+\.\S+/.test(formData.alternateEmail))
+        sectionErrors.alternateEmail = "Valid alternate email is required";
+      if (!formData.currentAddress) sectionErrors.currentAddress = "Current address is required";
+      if (!formData.permanentAddress) sectionErrors.permanentAddress = "Permanent address is required";
+      if (!formData.emergencyContact || !/^((\+91|0)?[0-9]{10})$/.test(formData.emergencyContact.replace(/\s/g, "")))
+        sectionErrors.emergencyContact = "Valid 10-digit emergency contact is required";
+      break;
+    case 2:
+      if (!formData.fathersName) sectionErrors.fathersName = "Father's name is required";
+      if (!formData.mothersName) sectionErrors.mothersName = "Mother's name is required";
+      if (!formData.fathersOccupation) sectionErrors.fathersOccupation = "Father's occupation is required";
+      if (!formData.mothersOccupation) sectionErrors.mothersOccupation = "Mother's occupation is required";
+      if (!formData.fathersContact || !/^((\+91|0)?[0-9]{10})$/.test(formData.fathersContact.replace(/\s/g, "")))
+        sectionErrors.fathersContact = "Valid 10-digit father's contact is required";
+      if (!formData.mothersContact || !/^((\+91|0)?[0-9]{10})$/.test(formData.mothersContact.replace(/\s/g, "")))
+        sectionErrors.mothersContact = "Valid 10-digit mother's contact is required";
+      break;
+    case 3:
+      const academicErrors = [];
+      const requiredAcademicFields = formData.hasPostgraduate === "Yes"
+        ? formStructure.requiredAcademicFields
+        : formStructure.requiredAcademicFields.filter(level => level !== "postgraduate");
+      requiredAcademicFields.forEach((level) => {
+        if (educationDetails[level].length === 0) {
+          academicErrors.push(`Please provide details for ${level.charAt(0).toUpperCase() + level.slice(1)}.`);
+        }
+        educationDetails[level].forEach((entry, index) => {
+          const subfields = formStructure.requiredAcademicSubfields[level];
+          if (subfields.schoolName && !entry.schoolName) {
+            sectionErrors[`school${level === "tenth" ? "10" : "12"}_${index}`] = "School name is required";
           }
-          educationDetails[level].forEach((entry, index) => {
-            const subfields = formStructure.requiredAcademicSubfields[level];
-            if (subfields.schoolName && !entry.schoolName) {
-              sectionErrors[`school${level === "tenth" ? "10" : "12"}_${index}`] = "School name is required";
+          if (subfields.board && !entry.board) {
+            sectionErrors[`board${level === "tenth" ? "10" : "12"}_${index}`] = "Board is required";
+          }
+          if (subfields.percentage && (!entry.percentage || isNaN(entry.percentage) || entry.percentage > 100)) {
+            sectionErrors[`percentage${level === "tenth" ? "10" : "12"}_${index}`] = "Valid percentage is required";
+          }
+          if (level === "twelth" && subfields.stream && !entry.stream) {
+            sectionErrors[`stream12_${index}`] = "Stream is required";
+          }
+          if (subfields.subjects && !entry.subjects) {
+            sectionErrors[`subjects${level === "tenth" ? "10" : "12"}_${index}`] = "Subjects are required";
+          }
+          if (level === "graduation" || level === "postgraduate") {
+            if (subfields.collegeName && !entry.collegeName) {
+              sectionErrors[`college${level === "graduation" ? "Grad" : "PG"}_${index}`] = "College name is required";
             }
-            if (subfields.board && !entry.board) {
-              sectionErrors[`board${level === "tenth" ? "10" : "12"}_${index}`] = "Board is required";
+            if (subfields.university && !entry.university) {
+              sectionErrors[`university${level === "graduation" ? "Grad" : "PG"}_${index}`] = "University is required";
             }
-            if (subfields.percentage && (!entry.percentage || isNaN(entry.percentage) || entry.percentage > 100)) {
-              sectionErrors[`percentage${level === "tenth" ? "10" : "12"}_${index}`] = "Valid percentage is required";
+            if (subfields.percentage && (!entry.percentage || isNaN(entry.percentage) || entry.percentage > 10)) {
+              sectionErrors[`percentage${level === "graduation" ? "Grad" : "PG"}_${index}`] = "Valid CGPA is required";
             }
-            if (level === "twelth" && subfields.stream && !entry.stream) {
-              sectionErrors[`stream12_${index}`] = "Stream is required";
+            if (subfields.degree && !entry.degree) {
+              sectionErrors[`degree${level === "graduation" ? "Grad" : "PG"}_${index}`] = "Degree is required";
             }
-            if (subfields.subjects && !entry.subjects) {
-              sectionErrors[`subjects${level === "tenth" ? "10" : "12"}_${index}`] = "Subjects are required";
+            if (subfields.branch && !entry.branch) {
+              sectionErrors[`branch${level === "graduation" ? "Grad" : "PG"}_${index}`] = "Branch is required";
             }
-            if (level === "graduation" || level === "postgraduate") {
-              if (subfields.collegeName && !entry.collegeName) {
-                sectionErrors[`college${level === "graduation" ? "Grad" : "PG"}_${index}`] = "College name is required";
-              }
-              if (subfields.university && !entry.university) {
-                sectionErrors[`university${level === "graduation" ? "Grad" : "PG"}_${index}`] = "University is required";
-              }
-              if (subfields.percentage && (!entry.percentage || isNaN(entry.percentage) || entry.percentage > 10)) {
-                sectionErrors[`percentage${level === "graduation" ? "Grad" : "PG"}_${index}`] = "Valid CGPA is required";
-              }
-              if (subfields.degree && !entry.degree) {
-                sectionErrors[`degree${level === "graduation" ? "Grad" : "PG"}_${index}`] = "Degree is required";
-              }
-              if (subfields.branch && !entry.branch) {
-                sectionErrors[`branch${level === "graduation" ? "Grad" : "PG"}_${index}`] = "Branch is required";
-              }
+          }
+          subfields.customFields.forEach((field) => {
+            if (field.required && !entry[field.name]) {
+              sectionErrors[`${field.name}_${level}_${index}`] = `${field.label} is required`;
             }
-            subfields.customFields.forEach((field) => {
-              if (field.required && !entry[field.name]) {
-                sectionErrors[`${field.name}_${level}_${index}`] = `${field.label} is required`;
-              }
-            });
           });
         });
-        if (academicErrors.length > 0) sectionErrors.academicDetails = academicErrors;
-        break;
-      case 4:
-        const docTypes = formData.documents.map((doc) => doc.type);
-        formStructure.requiredDocuments.forEach((doc) => {
-          if (!docTypes.includes(doc)) {
-            sectionErrors.documents = sectionErrors.documents
-              ? `${sectionErrors.documents}, ${doc} is required`
-              : `${doc} is required`;
-          }
-        });
-        if (formData.documents.length !== formStructure.requiredDocuments.length) {
+      });
+      if (academicErrors.length > 0) sectionErrors.academicDetails = academicErrors;
+      break;
+    case 4:
+      const requiredDocs = formData.hasPostgraduate === "Yes"
+        ? formStructure.requiredDocuments
+        : formStructure.requiredDocuments.filter(doc => doc !== "Postgraduate Marksheet");
+      const docTypes = formData.documents.map((doc) => doc.type);
+      requiredDocs.forEach((doc) => {
+        if (!docTypes.includes(doc)) {
           sectionErrors.documents = sectionErrors.documents
-            ? `${sectionErrors.documents}, Exactly ${formStructure.requiredDocuments.length} documents must be uploaded`
-            : `Exactly ${formStructure.requiredDocuments.length} documents must be uploaded`;
+            ? `${sectionErrors.documents}, ${doc} is required`
+            : `${doc} is required`;
         }
-        formData.documents.forEach((doc, index) => {
-          if (!doc.file) sectionErrors[`document_${index}`] = `File for ${doc.type} is required`;
-        });
-        break;
-      case 5:
-        if (!formData.agreement) sectionErrors.agreement = "You must agree to the terms and conditions";
-        break;
-      default:
-        break;
-    }
+      });
+      if (formData.documents.length !== requiredDocs.length) {
+        sectionErrors.documents = sectionErrors.documents
+          ? `${sectionErrors.documents}, Exactly ${requiredDocs.length} documents must be uploaded`
+          : `Exactly ${requiredDocs.length} documents must be uploaded`;
+      }
+      formData.documents.forEach((doc, index) => {
+        if (!doc.file) sectionErrors[`document_${index}`] = `File for ${doc.type} is required`;
+      });
+      break;
+    case 5:
+      if (!formData.agreement) sectionErrors.agreement = "You must agree to the terms and conditions";
+      break;
+    default:
+      break;
+  }
 
-    setErrors(sectionErrors);
-    return Object.keys(sectionErrors).length === 0;
-  };
+  setErrors(sectionErrors);
+  return Object.keys(sectionErrors).length === 0;
+};
 
   const handleNext = async () => {
     if (activeIndex === 0) {
@@ -839,110 +854,111 @@ const ApplicationForm = () => {
     }
   };
 
-  const renderViewMode = () => (
-    <div className="view-modal">
-      <div className="view-content">
-        <h2>Review Your Application</h2>
-        {sections.map((section, index) => (
-          <div key={section} className="view-section">
-            <h3>{section}</h3>
-            {index === 0 && (
-              <div className="personal-details">
-                <p><strong>Full Name:</strong> {formData.fullName || "N/A"}</p>
-                <p><strong>Date of Birth:</strong> {formData.dob || "N/A"}</p>
-                <p><strong>Gender:</strong> {formData.gender || "N/A"}</p>
-                <p><strong>Nationality:</strong> {formData.nationality || "N/A"}</p>
-                <p><strong>Aadhaar Number:</strong> {formData.aadhaarNumber || "N/A"}</p>
-              </div>
-            )}
-            {index === 1 && (
-              <div className="contact-information">
-                <p><strong>Phone Number:</strong> {formData.phoneNumber || "N/A"}</p>
-                <p><strong>Email:</strong> {formData.email || "N/A"}</p>
-                <p><strong>Alternate Email:</strong> {formData.alternateEmail || "N/A"}</p>
-                <p><strong>Current Address:</strong> {formData.currentAddress || "N/A"}</p>
-                <p><strong>Permanent Address:</strong> {formData.permanentAddress || "N/A"}</p>
-                <p><strong>Emergency Contact:</strong> {formData.emergencyContact || "N/A"}</p>
-              </div>
-            )}
-            {index === 2 && (
-              <div className="parent-details">
-                <p><strong>Father's Name:</strong> {formData.fathersName || "N/A"}</p>
-                <p><strong>Mother's Name:</strong> {formData.mothersName || "N/A"}</p>
-                <p><strong>Father's Occupation:</strong> {formData.fathersOccupation || "N/A"}</p>
-                <p><strong>Mother's Occupation:</strong> {formData.mothersOccupation || "N/A"}</p>
-                <p><strong>Father's Contact:</strong> {formData.fathersContact || "N/A"}</p>
-                <p><strong>Mother's Contact:</strong> {formData.mothersContact || "N/A"}</p>
-              </div>
-            )}
-            {index === 3 && (
-              <div className="academic-details">
-                {formStructure.requiredAcademicFields.map((level) => (
-                  <div key={level}>
-                    <h4>{level === "tenth" ? "10th" : level === "twelth" ? "12th" : level.charAt(0).toUpperCase() + level.slice(1)} Details</h4>
-                    {educationDetails[level].map((entry, idx) => (
-                      <div key={idx}>
-                        {(level === "tenth" || level === "twelth") && (
-                          <>
-                            <p><strong>School Name:</strong> {entry.schoolName || "N/A"}</p>
-                            <p><strong>Board:</strong> {entry.board || "N/A"}</p>
-                            <p><strong>Year of Passing:</strong> {entry.year || "N/A"}</p>
-                            <p><strong>Percentage:</strong> {entry.percentage || "N/A"}</p>
-                            <p><strong>Subjects:</strong> {entry.subjects || "N/A"}</p>
-                            {level === "twelth" && <p><strong>Stream:</strong> {entry.stream || "N/A"}</p>}
-                          </>
-                        )}
-                        {(level === "graduation" || level === "postgraduate") && (
-                          <>
-                            <p><strong>College Name:</strong> {entry.collegeName || "N/A"}</p>
-                            <p><strong>Degree:</strong> {entry.degree || "N/A"}</p>
-                            <p><strong>Branch:</strong> {entry.branch || "N/A"}</p>
-                            <p><strong>University:</strong> {entry.university || "N/A"}</p>
-                            <p><strong>Year of Passing:</strong> {entry.year || "N/A"}</p>
-                            <p><strong>CGPA:</strong> {entry.percentage || "N/A"}</p>
-                          </>
-                        )}
-                        {formStructure.requiredAcademicSubfields[level].customFields.map((field) => (
-                          <p key={field.name}><strong>{field.label}:</strong> {entry[field.name] || "N/A"}</p>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-            {index === 4 && (
-              <div className="document-upload">
-                {formData.documents.map((doc, idx) => (
-                  <p key={idx}><strong>{doc.type}:</strong> {doc.file ? doc.file.name : "No file uploaded"}</p>
-                ))}
-              </div>
-            )}
-            {index === 5 && (
-              <div className="declaration">
-                <p><strong>Agreement:</strong> {formData.agreement ? "Agreed" : "Not Agreed"}</p>
-              </div>
-            )}
-            <button
-              type="button"
-              className="edit-btn"
-              onClick={() => handleEditSection(index)}
-            >
-              Edit {section}
-            </button>
-          </div>
-        ))}
-        <div className="view-navigation">
-          <button type="button" className="back-btn" onClick={handleCloseView}>
-            Back to Form
-          </button>
-          <button type="button" className="submit-btn" onClick={handleSubmit}>
-            Submit Application
+const renderViewMode = () => (
+  <div className="view-modal">
+    <div className="view-content">
+      <h2>Review Your Application</h2>
+      {sections.map((section, index) => (
+        <div key={section} className="view-section">
+          <h3>{section}</h3>
+          {index === 0 && (
+            <div className="personal-details">
+              <p><strong>Full Name:</strong> {formData.fullName || "N/A"}</p>
+              <p><strong>Date of Birth:</strong> {formData.dob || "N/A"}</p>
+              <p><strong>Gender:</strong> {formData.gender || "N/A"}</p>
+              <p><strong>Nationality:</strong> {formData.nationality || "N/A"}</p>
+              <p><strong>Aadhaar Number:</strong> {formData.aadhaarNumber || "N/A"}</p>
+            </div>
+          )}
+          {index === 1 && (
+            <div className="contact-information">
+              <p><strong>Phone Number:</strong> {formData.phoneNumber || "N/A"}</p>
+              <p><strong>Email:</strong> {formData.email || "N/A"}</p>
+              <p><strong>Alternate Email:</strong> {formData.alternateEmail || "N/A"}</p>
+              <p><strong>Current Address:</strong> {formData.currentAddress || "N/A"}</p>
+              <p><strong>Permanent Address:</strong> {formData.permanentAddress || "N/A"}</p>
+              <p><strong>Emergency Contact:</strong> {formData.emergencyContact || "N/A"}</p>
+            </div>
+          )}
+          {index === 2 && (
+            <div className="parent-details">
+              <p><strong>Father's Name:</strong> {formData.fathersName || "N/A"}</p>
+              <p><strong>Mother's Name:</strong> {formData.mothersName || "N/A"}</p>
+              <p><strong>Father's Occupation:</strong> {formData.fathersOccupation || "N/A"}</p>
+              <p><strong>Mother's Occupation:</strong> {formData.mothersOccupation || "N/A"}</p>
+              <p><strong>Father's Contact:</strong> {formData.fathersContact || "N/A"}</p>
+              <p><strong>Mother's Contact:</strong> {formData.mothersContact || "N/A"}</p>
+            </div>
+          )}
+          {index === 3 && (
+            <div className="academic-details">
+              <p><strong>Completed Postgraduate Studies:</strong> {formData.hasPostgraduate}</p>
+              {(formData.hasPostgraduate === "Yes" ? formStructure.requiredAcademicFields : formStructure.requiredAcademicFields.filter(level => level !== "postgraduate")).map((level) => (
+                <div key={level}>
+                  <h4>{level === "tenth" ? "10th" : level === "twelth" ? "12th" : level.charAt(0).toUpperCase() + level.slice(1)} Details</h4>
+                  {educationDetails[level].map((entry, idx) => (
+                    <div key={idx}>
+                      {(level === "tenth" || level === "twelth") && (
+                        <>
+                          <p><strong>School Name:</strong> {entry.schoolName || "N/A"}</p>
+                          <p><strong>Board:</strong> {entry.board || "N/A"}</p>
+                          <p><strong>Year of Passing:</strong> {entry.year || "N/A"}</p>
+                          <p><strong>Percentage:</strong> {entry.percentage || "N/A"}</p>
+                          <p><strong>Subjects:</strong> {entry.subjects || "N/A"}</p>
+                          {level === "twelth" && <p><strong>Stream:</strong> {entry.stream || "N/A"}</p>}
+                        </>
+                      )}
+                      {(level === "graduation" || level === "postgraduate") && (
+                        <>
+                          <p><strong>College Name:</strong> {entry.collegeName || "N/A"}</p>
+                          <p><strong>Degree:</strong> {entry.degree || "N/A"}</p>
+                          <p><strong>Branch:</strong> {entry.branch || "N/A"}</p>
+                          <p><strong>University:</strong> {entry.university || "N/A"}</p>
+                          <p><strong>Year of Passing:</strong> {entry.year || "N/A"}</p>
+                          <p><strong>CGPA:</strong> {entry.percentage || "N/A"}</p>
+                        </>
+                      )}
+                      {formStructure.requiredAcademicSubfields[level].customFields.map((field) => (
+                        <p key={field.name}><strong>{field.label}:</strong> {entry[field.name] || "N/A"}</p>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+          {index === 4 && (
+            <div className="document-upload">
+              {formData.documents.map((doc, idx) => (
+                <p key={idx}><strong>{doc.type}:</strong> {doc.file ? doc.file.name : "No file uploaded"}</p>
+              ))}
+            </div>
+          )}
+          {index === 5 && (
+            <div className="declaration">
+              <p><strong>Agreement:</strong> {formData.agreement ? "Agreed" : "Not Agreed"}</p>
+            </div>
+          )}
+          <button
+            type="button"
+            className="edit-btn"
+            onClick={() => handleEditSection(index)}
+          >
+            Edit {section}
           </button>
         </div>
+      ))}
+      <div className="view-navigation">
+        <button type="button" className="back-btn" onClick={handleCloseView}>
+          Back to Form
+        </button>
+        <button type="button" className="submit-btn" onClick={handleSubmit}>
+          Submit Application
+        </button>
       </div>
     </div>
-  );
+  </div>
+);
 
   return (
     <div className="app-container">
@@ -1237,7 +1253,28 @@ const ApplicationForm = () => {
 
                 {activeIndex === 3 && (
                   <div className="academic-details">
-                    {formStructure.requiredAcademicFields.map((level, idx) => (
+                    <div className="radio-group">
+                      <h4>Do you have completed postgraduate studies?</h4>
+                      <label>
+                        <input
+                          type="radio"
+                          value="Yes"
+                          checked={formData.hasPostgraduate === "Yes"}
+                          onChange={() => setFormData({ ...formData, hasPostgraduate: "Yes" })}
+                        />
+                        Yes
+                      </label>
+                      <label>
+                        <input
+                          type="radio"
+                          value="No"
+                          checked={formData.hasPostgraduate === "No"}
+                          onChange={() => setFormData({ ...formData, hasPostgraduate: "No" })}
+                        />
+                        No
+                      </label>
+                    </div>
+                    {(formData.hasPostgraduate === "Yes" ? formStructure.requiredAcademicFields : formStructure.requiredAcademicFields.filter(level => level !== "postgraduate")).map((level, idx) => (
                       <div key={idx} className="accordion-section">
                         <button
                           className="accordion"
@@ -1291,66 +1328,63 @@ const ApplicationForm = () => {
                                 </div>
                               </div>
                             ))}
-                            <button
-                              type="button"
-                              className="add-btn"
-                              onClick={() => handleAddEducation(level)}
-                              disabled={educationDetails[level].length > 0}
-                            >
-                              Add {level === "tenth" ? "10th" : level === "twelth" ? "12th" : level.charAt(0).toUpperCase() + level.slice(1)} Details
-                            </button>
+                            {educationDetails[level].length === 0 && (
+                              <button
+                                type="button"
+                                className="add-btn"
+                                onClick={() => handleAddEducation(level)}
+                              >
+                                Add {level === "tenth" ? "10th" : level === "twelth" ? "12th" : level.charAt(0).toUpperCase() + level.slice(1)} Details
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
                     ))}
                     {errors.academicDetails && (
-                      <ul className="error">
-                        {errors.academicDetails.map((error, index) => (
-                          <li key={`academic-error-${index}`}>{error}</li>
+                      <div className="error">
+                        {errors.academicDetails.map((error, idx) => (
+                          <p key={idx}>{error}</p>
                         ))}
-                      </ul>
+                      </div>
                     )}
                   </div>
                 )}
 
                 {activeIndex === 4 && (
                   <div className="document-upload">
-                    <label>Select Document Type:</label>
                     <div className="document-selector">
                       <select
                         value={selectedDocument}
                         onChange={(e) => setSelectedDocument(e.target.value)}
                       >
-                        <option value="">Select a document</option>
-                        {formStructure.requiredDocuments.map((doc) => (
-                          <option
-                            key={doc}
-                            value={doc}
-                            disabled={formData.documents.some((d) => d.type === doc)}
-                          >
+                        <option value="">Select Document</option>
+                        {(formData.hasPostgraduate === "Yes" ? formStructure.requiredDocuments : formStructure.requiredDocuments.filter(doc => doc !== "Postgraduate Marksheet")).map((doc, idx) => (
+                          <option key={idx} value={doc}>
                             {doc}
                           </option>
                         ))}
                       </select>
                       <button
                         type="button"
-                        className="add-btn"
                         onClick={handleAddDocument}
-                        disabled={!selectedDocument || formData.documents.length >= formStructure.requiredDocuments.length}
+                        disabled={
+                          !selectedDocument ||
+                          formData.documents.length >= (formData.hasPostgraduate === "Yes" ? formStructure.requiredDocuments.length : formStructure.requiredDocuments.filter(doc => doc !== "Postgraduate Marksheet").length)
+                        }
                       >
                         Add Document
                       </button>
                     </div>
-                    {errors.documents && <span className="error">{errors.documents}</span>}
-
                     <div className="document-list">
                       {formData.documents.map((doc, index) => (
                         <div key={index} className="document-row">
                           <span>{doc.type}</span>
                           <input
                             type="file"
-                            accept={doc.type === "Image (Passport Photo)" || doc.type === "Signature" ? "image/*" : "*"}
+                            accept=".jpg,.jpeg,.png,.pdf"
                             onChange={(e) => handleDocumentFileChange(index, e.target.files[0])}
+                            required
                           />
                           <button
                             type="button"
@@ -1365,6 +1399,7 @@ const ApplicationForm = () => {
                         </div>
                       ))}
                     </div>
+                    {errors.documents && <span className="error">{errors.documents}</span>}
                   </div>
                 )}
 
