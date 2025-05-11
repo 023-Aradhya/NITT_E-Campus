@@ -5,6 +5,19 @@ const UserModel = require("../models/User");
 const ApplicationForm = require("../models/ApplicationForm");
 const PaymentModel = require("../models/Payment");
 
+//for sending a congratulatory message after verified successfully to student
+const nodemailer = require("nodemailer");
+require("dotenv").config();
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+
 router.get("/assigned-students", auth, authorize(["verification_officer"]), async (req, res) => {
   try {
     const applications = await ApplicationForm.find({
@@ -170,10 +183,38 @@ router.post("/verify-application/:applicationId", auth, authorize(["verification
       }
     }
     await application.save();
-
+    
     application.studentId.verified = verified;
     application.studentId.verifiedBy = verified ? req.user.userId : null;
     await application.studentId.save();
+
+    // Send email notification if application is verified
+    if (verified) {
+      const verificationDate = new Date().toLocaleString();
+      const courseTitle = application.courseId?.title || "the course";
+
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: application.studentId.email,
+        subject: "Congratulations! Your Application Has Been Verified",
+        html: `
+          <h2>Dear ${application.studentId.name},</h2>
+          <p>Congratulations! 🎉 Your application for <strong>${courseTitle}</strong> has been successfully verified.</p>
+          <p>You have been officially admitted to the program as of <strong>${verificationDate}</strong>.</p>
+          <p>We are excited to have you join us! Please log in to your account to view further details and next steps.</p>
+          <p><strong>Best Wishes,</strong></p>
+          <p><strong>Your Admission Team</strong></p>
+        `,
+      };
+
+      transporter.sendMail(mailOptions, (err, info) => {
+        if (err) {
+          console.error("Error sending verification email:", err);
+        } else {
+          console.log("Verification email sent:", info.response);
+        }
+      });
+    }
 
     res.json({ message: `Application ${verified ? "verified" : "rejected"} successfully` });
   } catch (error) {
