@@ -17,7 +17,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-
 router.get("/assigned-students", auth, authorize(["verification_officer"]), async (req, res) => {
   try {
     const applications = await ApplicationForm.find({
@@ -183,11 +182,11 @@ router.post("/verify-application/:applicationId", auth, authorize(["verification
       }
     }
     await application.save();
-    
+
     application.studentId.verified = verified;
     application.studentId.verifiedBy = verified ? req.user.userId : null;
     await application.studentId.save();
-
+    
     // Send email notification if application is verified
     if (verified) {
       const verificationDate = new Date().toLocaleString("en-US", {
@@ -219,6 +218,7 @@ router.post("/verify-application/:applicationId", auth, authorize(["verification
         }
       });
     }
+
 
     res.json({ message: `Application ${verified ? "verified" : "rejected"} successfully` });
   } catch (error) {
