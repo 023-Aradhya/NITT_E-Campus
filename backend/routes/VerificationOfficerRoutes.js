@@ -150,7 +150,7 @@ router.post("/verify-application/:applicationId", auth, authorize(["verification
     const application = await ApplicationForm.findById(applicationId).populate(
       "studentId",
       "name email verified verifiedBy"
-    );
+    ).populate("courseId", "title");
 
     if (!application) {
       return res.status(404).json({ message: "Application not found" });
@@ -190,7 +190,11 @@ router.post("/verify-application/:applicationId", auth, authorize(["verification
 
     // Send email notification if application is verified
     if (verified) {
-      const verificationDate = new Date().toLocaleString();
+      const verificationDate = new Date().toLocaleString("en-US", {
+        timeZone: "Asia/Kolkata", // Adjust to your desired timezone
+        dateStyle: "medium",
+        timeStyle: "medium",
+      });
       const courseTitle = application.courseId?.title || "the course";
 
       const mailOptions = {
