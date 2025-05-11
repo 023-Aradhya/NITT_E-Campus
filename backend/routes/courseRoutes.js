@@ -76,7 +76,7 @@ router.get("/:courseId/description", auth, authorize(["content_admin"]), async (
 
 // Admin adds a course
 router.post("/newCourse", auth, authorize(["admin"]), async (req, res) => {
-  const { title, description, duration, fee, requirement, contact, subjectCode, assignedTo } = req.body;
+  const { title, description, duration, fee, requirement, contact, subjectCode, assignedTo,deadline } = req.body;
 
   // Log the received data for debugging
   console.log("Received course data:", req.body);
@@ -91,6 +91,7 @@ router.post("/newCourse", auth, authorize(["admin"]), async (req, res) => {
   if (!contact?.trim()) missingFields.push("contact");
   if (!subjectCode?.trim()) missingFields.push("subjectCode");
   if (!assignedTo?.trim()) missingFields.push("assignedTo");
+  if (deadline && isNaN(Date.parse(deadline))) missingFields.push("deadline (invalid date)");
 
   if (missingFields.length > 0) {
     console.log("Missing or invalid fields:", missingFields);
@@ -111,6 +112,7 @@ router.post("/newCourse", auth, authorize(["admin"]), async (req, res) => {
       contact: contact.trim(),
       subjectCode: subjectCode.trim(),
       assignedTo: assignedTo.trim(),
+      deadline: deadline ? new Date(deadline) : null,
     });
 
     // Log the newCourse object to confirm programType is not set
