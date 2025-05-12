@@ -229,18 +229,15 @@
   }
 
   .navbar-links {
-    display: none;
-    flex-direction: column;
+    display: flex; /* Keep links visible */
+    flex-direction: row; /* Arrange links horizontally */
+    flex-wrap: wrap; /* Allow wrapping if needed */
     width: 100%;
-  }
-
-  .navbar-links.active {
-    display: flex;
+    justify-content: center; /* Center links */
   }
 
   .navbar-links li {
-    text-align: center;
-    margin: 8px 0;
+    margin: 8px 12px; /* Adjust spacing */
   }
 
   .navbar-actions {
