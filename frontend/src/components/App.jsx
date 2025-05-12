@@ -21,7 +21,7 @@ import VerificationAdminDashboard from "./VerificationAdminDashboard";
 import VerificationOfficerDashboard from "./VerificationOfficerDashboard";
 import VerificationOfficerCreation from "./VerificationOfficerCreation";
 import ApplicationForm from "./ApplicationForm";
-import ChangePassword from "./ChangePassword";
+import ChangeCredentials from "./ChangeCredentials";
 import NewNotice from "./NewNotice";
 import AdminDetails from "./AdminDetails"; 
 import Payment from "./Payment";
@@ -100,7 +100,7 @@ function App() {
           <Route path="/newNotice" element={<NewNotice />} />
           <Route path="/newNotice/:id" element={<NewNotice />} />
           <Route path="/payment" element={<Payment />} />
-          <Route path="/change-password" element={<ChangePassword />} />
+          <Route path="/change-credentials" element={<ChangeCredentials />} />
           <Route path="/notifications" element={<Notifications />} />
 
           {/* Faculty Dashboard with Nested Routing */}

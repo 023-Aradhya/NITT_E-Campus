@@ -64,7 +64,7 @@ const Navbar = () => {
   };
 
   const handleChangePassword = () => {
-    navigate("/change-password");
+    navigate("/change-credentials");
     setIsDropdownOpen(false);
   };
 
@@ -115,7 +115,7 @@ const Navbar = () => {
           {isDropdownOpen && (
             <div className="dropdown-menu">
               <button onClick={handleDashboardRedirect}>Dashboard</button>
-              <button onClick={handleChangePassword}>Change Password</button>
+              <button onClick={handleChangePassword}>Change Credentials</button>
               <button onClick={handleLogout}>Logout</button>
             </div>
           )}

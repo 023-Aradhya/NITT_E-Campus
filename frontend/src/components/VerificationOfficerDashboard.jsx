@@ -83,11 +83,11 @@ const VerificationOfficerDashboard = () => {
   };
 
   const verifyApplication = async (applicationId, verified) => {
-    // Only validate checkboxes when verifying (not when unverifying)
+    // Only validate checkboxes when verifying (not when rejecting)
     if (verified) {
       // Check if there are any checkboxes
       if (Object.keys(checkboxes).length === 0) {
-        setVerificationError("Please open student details and check all required fields before verifying.");
+        setVerificationError("Please reopen student details and check all required fields before verifying.");
         return;
       }
       
@@ -128,22 +128,24 @@ const VerificationOfficerDashboard = () => {
     }
   };
 
-  const saveComments = async (applicationId) => {
+  //  Renamed saveComments to rejectApplication and updated to reject the application
+  const rejectApplication = async (applicationId) => {
     try {
+      // Use the verify-application endpoint with verified: false to reject the application
       const res = await axios.post(
-        `${API_BASE_URL}/verification-officer/save-application-comments/${applicationId}`,
-        { comments, fieldComments },
+        `${API_BASE_URL}/verification-officer/verify-application/${applicationId}`,
+        { verified: false, comments, fieldComments },
         getAuthHeaders()
       );
-      updateApplicationState(applicationId, selectedStudent.application.verified, comments, fieldComments);
+      updateApplicationState(applicationId, false, comments, fieldComments);
       alert(res.data.message);
       setComments(""); // Reset comments after submission
       setFieldComments({}); // Reset field comments after submission
     } catch (err) {
-      console.error("Error saving comments:", err);
+      console.error("Error rejecting application:", err);
       setVerificationError(
         err.response?.data?.message ||
-          "Failed to save comments. Please try again."
+          "Failed to reject application. Please try again."
       );
     }
   };
@@ -662,7 +664,7 @@ const VerificationOfficerDashboard = () => {
                   </p>
                   <p>
                     <strong>Mother's Contact:</strong>{" "}
-                    {selectedStudent.application?.formData?.fothersContact || "N/A"}
+                    {selectedStudent.application?.formData?.mothersContact || "N/A"}
                   </p>
                 </div>
               )}
@@ -941,7 +943,7 @@ const VerificationOfficerDashboard = () => {
                 <textarea
                   value={comments}
                   onChange={handleCommentsChange}
-                  placeholder="Enter general verification/unverification comments (optional)"
+                  placeholder="Enter verification or rejection comments (optional)"
                   rows="4"
                   style={{
                     width: "100%",
@@ -958,27 +960,21 @@ const VerificationOfficerDashboard = () => {
             <div className="vo-modal-actions">
               {selectedStudent.application && (
                 <>
+                  {/* Modified: Reintroduced Verify button, removed toggling (only verifies if not already verified) */}
+                  {!selectedStudent.application.verified && (
+                    <button
+                      className="vo-btn-verify"
+                      onClick={() => verifyApplication(selectedStudent.application._id, true)}
+                    >
+                      <FaCheckCircle /> Verify
+                    </button>
+                  )}
+                  {/* Modified: Updated Send Comments to Reject and Send Comments */}
                   <button
-                    className={
-                      selectedStudent.application.verified
-                        ? "vo-btn-unverify"
-                        : "vo-btn-verify"
-                    }
-                    onClick={() =>
-                      verifyApplication(
-                        selectedStudent.application._id,
-                        !selectedStudent.application.verified
-                      )
-                    }
+                    className="vo-btn-unverify"
+                    onClick={() => rejectApplication(selectedStudent.application._id)}
                   >
-                    <FaUserCheck />{" "}
-                    {selectedStudent.application.verified ? "Unverify" : "Verify"} Application
-                  </button>
-                  <button
-                    className="vo-btn-details"
-                    onClick={() => saveComments(selectedStudent.application._id)}
-                  >
-                    <FaInfoCircle /> Send Comments
+                    <FaTimesCircle /> Reject and Send Comments
                   </button>
                   {verificationError && (
                     <div className="vo-error-message" style={{ margin: "0 1rem", alignSelf: "center" }}>

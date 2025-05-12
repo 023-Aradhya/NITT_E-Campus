@@ -377,39 +377,100 @@ app.put("/change-password", auth, async (req, res) => {
   try {
     const { currentPassword, newPassword, confirmNewPassword } = req.body;
 
+    // Validate inputs
     if (!currentPassword || !newPassword || !confirmNewPassword) {
       return res.status(400).json({ message: "All fields are required." });
     }
-
     if (newPassword !== confirmNewPassword) {
       return res.status(400).json({ message: "New passwords do not match." });
     }
+    if (newPassword.length < 4) {
+      return res.status(400).json({ message: "New password must be at least 6 characters long." });
+    }
 
     const userId = req.user.userId;
-
     const user = await UserModel.findById(userId);
 
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
 
+    // Verify current password
     const isMatch = await bcrypt.compare(currentPassword, user.password);
-
     if (!isMatch) {
       return res.status(400).json({ message: "Current password is incorrect." });
     }
 
+    // Update password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
     user.password = hashedPassword;
+
     await user.save();
 
-    res.json({ message: "Password changed successfully!" });
+    res.json({ message: "Password updated successfully!" });
   } catch (error) {
-    console.error("Error changing password:", error);
-    res.status(500).json({ message: "Something went wrong. Try again later." });
+    console.error("Error updating password:", {
+      message: error.message,
+      stack: error.stack,
+      requestBody: req.body,
+    });
+    res.status(500).json({ message: "Something went wrong. Please try again later." });
   }
 });
+
+app.put("/change-email", auth, async (req, res) => {
+  try {
+    const { currentEmail, newEmail } = req.body;
+
+    // Validate inputs
+    if (!currentEmail || !newEmail) {
+      return res.status(400).json({ message: "All fields are required." });
+    }
+    if (!/^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(newEmail)) {
+      return res.status(400).json({ message: "Invalid new email format." });
+    }
+
+    const userId = req.user.userId;
+    const user = await UserModel.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // Verify current email
+    if (user.email !== currentEmail) {
+      return res.status(400).json({ message: "Current email is incorrect." });
+    }
+
+    // Check for email conflict
+    const existingUser = await UserModel.findOne({ email: newEmail });
+    if (existingUser && existingUser._id.toString() !== userId) {
+      return res.status(400).json({ message: "New email is already in use." });
+    }
+
+    // Update email
+    user.email = newEmail;
+    await user.save();
+
+    // Generate new token
+    const token = jwt.sign(
+      { userId: user._id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    res.json({ message: "Email updated successfully!", token });
+  } catch (error) {
+    console.error("Error updating email:", {
+      message: error.message,
+      stack: error.stack,
+      requestBody: req.body,
+    });
+    res.status(500).json({ message: "Something went wrong. Please try again later." });
+  }
+});
+
+
 const PORT=process.env.PORT || 3001
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
