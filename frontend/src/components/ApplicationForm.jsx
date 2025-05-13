@@ -1253,27 +1253,29 @@ const renderViewMode = () => (
 
                 {activeIndex === 3 && (
                   <div className="academic-details">
-                    <div className="radio-group">
-                      <h4>Do you have completed postgraduate studies?</h4>
-                      <label>
-                        <input
-                          type="radio"
-                          value="Yes"
-                          checked={formData.hasPostgraduate === "Yes"}
-                          onChange={() => setFormData({ ...formData, hasPostgraduate: "Yes" })}
-                        />
-                        Yes
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          value="No"
-                          checked={formData.hasPostgraduate === "No"}
-                          onChange={() => setFormData({ ...formData, hasPostgraduate: "No" })}
-                        />
-                        No
-                      </label>
-                    </div>
+                        {formStructure.programType === "PG" && (
+                          <div className="radio-group">
+                            <h4>Do you have completed postgraduate studies?</h4>
+                            <label>
+                              <input
+                                type="radio"
+                                value="Yes"
+                                checked={formData.hasPostgraduate === "Yes"}
+                                onChange={() => setFormData({ ...formData, hasPostgraduate: "Yes" })}
+                              />
+                              Yes
+                            </label>
+                            <label>
+                              <input
+                                type="radio"
+                                value="No"
+                                checked={formData.hasPostgraduate === "No"}
+                                onChange={() => setFormData({ ...formData, hasPostgraduate: "No" })}
+                              />
+                              No
+                            </label>
+                          </div>
+                        )}
                     {(formData.hasPostgraduate === "Yes" ? formStructure.requiredAcademicFields : formStructure.requiredAcademicFields.filter(level => level !== "postgraduate")).map((level, idx) => (
                       <div key={idx} className="accordion-section">
                         <button
