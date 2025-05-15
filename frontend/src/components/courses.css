@@ -190,6 +190,9 @@
   align-items: center;
   z-index: 1000;
   backdrop-filter: blur(5px);
+  overflow-y: auto; /* Allow scrolling if content overflows vertically */
+  padding: 20px; /* Add padding to prevent content from touching edges */
+  box-sizing: border-box;
 }
 
 .courses-page-edit-content {
@@ -198,8 +201,11 @@
   border-radius: 15px;
   width: 90%;
   max-width: 600px;
+  max-height: 90vh; /* Limit height to 90% of viewport height */
+  overflow-y: auto; /* Enable scrolling for overflowing content */
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
   position: relative;
+  box-sizing: border-box;
 }
 
 .courses-page-edit-content h2 {
@@ -222,6 +228,7 @@
   border-radius: 8px;
   font-size: 1rem;
   transition: all 0.3s ease;
+  box-sizing: border-box; /* Ensure padding doesn't increase width */
 }
 
 .courses-page-form-container input:focus,
@@ -286,8 +293,49 @@
   .courses-page-grid {
     grid-template-columns: 1fr;
   }
+  .courses-page-edit-modal {
+    padding: 10px; /* Reduce padding on smaller screens */
+  }
   
   .courses-page-edit-content {
     padding: 20px;
+    width: 95%; /* Use more of the screen width */
+    max-width: 100%; /* Remove max-width constraint */
+    max-height: 85vh; /* Slightly reduce max-height for smaller screens */
+  }
+
+  .courses-page-edit-content h2 {
+    font-size: 1.5rem; /* Reduce heading size for smaller screens */
+  }
+
+  .courses-page-form-container input,
+  .courses-page-form-container textarea {
+    font-size: 0.9rem; /* Slightly smaller font for better fit */
+  }
+
+  .courses-page-modal-btns {
+    flex-direction: column; /* Stack buttons vertically on small screens */
+    gap: 10px;
+  }
+
+  .courses-page-modal-btn {
+    width: 100%; /* Make buttons full-width */
+    padding: 10px;
+  }
+}
+@media (max-width: 480px) {
+  .courses-page-edit-content {
+    padding: 15px;
+    width: 98%;
+    max-height: 80vh;
+  }
+
+  .courses-page-form-container input,
+  .courses-page-form-container textarea {
+    font-size: 0.85rem;
+  }
+
+  .courses-page-edit-content h2 {
+    font-size: 1.3rem;
   }
 }

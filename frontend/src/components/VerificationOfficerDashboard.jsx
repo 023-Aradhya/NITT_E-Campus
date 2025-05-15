@@ -255,8 +255,8 @@ const VerificationOfficerDashboard = () => {
       });
     }
     
-    // Add payment checkbox only if payment exists and status is completed
-    if (application?.payment && application.payment.status === "completed") {
+    // Add payment checkbox if payment is missing or not completed
+    if (application && (!application.payment || application.payment?.status !== "completed")) {
       initialCheckboxes.payment = false;
       initialFieldComments.payment = "";
     }
@@ -361,6 +361,149 @@ const VerificationOfficerDashboard = () => {
   };
 
   const checkboxProgress = calculateCheckboxProgress();
+  
+
+  const renderAcademicEntryFields = (level, entry) => {
+  const fields = [];
+
+  // Define standard fields for 10th and 12th
+  if (level === "tenth" || level === "twelth") {
+    // Add schoolName if filled
+    if (entry.schoolName && entry.schoolName.trim()) {
+      fields.push(
+        <p key="schoolName">
+          <strong>School Name:</strong> {entry.schoolName}
+        </p>
+      );
+    }
+    // Add board if filled
+    if (entry.board && entry.board.trim()) {
+      fields.push(
+        <p key="board">
+          <strong>Board:</strong> {entry.board}
+        </p>
+      );
+    }
+    // Add yearOfPassing or year if filled
+    if (entry.yearOfPassing || (entry.year && entry.year.trim())) {
+      fields.push(
+        <p key="yearOfPassing">
+          <strong>Year of Passing:</strong> {entry.yearOfPassing || entry.year}
+        </p>
+      );
+    }
+    // Add percentage if filled
+    if (entry.percentage && entry.percentage.trim()) {
+      fields.push(
+        <p key="percentage">
+          <strong>Percentage:</strong> {entry.percentage}
+        </p>
+      );
+    }
+    // Add subjects if filled
+    if (entry.subjects && entry.subjects.trim()) {
+      fields.push(
+        <p key="subjects">
+          <strong>Subjects:</strong> {entry.subjects}
+        </p>
+      );
+    }
+    // Add stream for 12th if filled
+    if (level === "twelth" && entry.stream && entry.stream.trim()) {
+      fields.push(
+        <p key="stream">
+          <strong>Stream:</strong> {entry.stream}
+        </p>
+      );
+    }
+  } else {
+    // Define standard fields for graduation and postgraduate
+    // Add collegeName if filled
+    if (entry.collegeName && entry.collegeName.trim()) {
+      fields.push(
+        <p key="collegeName">
+          <strong>College Name:</strong> {entry.collegeName}
+        </p>
+      );
+    }
+    // Add degree if filled
+    if (entry.degree && entry.degree.trim()) {
+      fields.push(
+        <p key="degree">
+          <strong>Degree:</strong> {entry.degree}
+        </p>
+      );
+    }
+    // Add branch if filled
+    if (entry.branch && entry.branch.trim()) {
+      fields.push(
+        <p key="branch">
+          <strong>Branch:</strong> {entry.branch}
+        </p>
+      );
+    }
+    // Add university if filled
+    if (entry.university && entry.university.trim()) {
+      fields.push(
+        <p key="university">
+          <strong>University:</strong> {entry.university}
+        </p>
+      );
+    }
+    // Add yearOfPassing or year if filled
+    if (entry.yearOfPassing || (entry.year && entry.year.trim())) {
+      fields.push(
+        <p key="yearOfPassing">
+          <strong>Year of Passing:</strong> {entry.yearOfPassing || entry.year}
+        </p>
+      );
+    }
+    // Add CGPA or percentage if filled
+    if (entry.percentage || (entry.cgpa && entry.cgpa.trim())) {
+      fields.push(
+        <p key="cgpa">
+          <strong>CGPA:</strong> {entry.percentage || entry.cgpa}
+        </p>
+      );
+    }
+  }
+
+  // Handle custom fields, excluding standard fields
+  const standardFields = [
+    "schoolName",
+    "board",
+    "yearOfPassing",
+    "year",
+    "percentage",
+    "subjects",
+    "stream",
+    "collegeName",
+    "degree",
+    "branch",
+    "university",
+    "cgpa",
+  ];
+  Object.keys(entry)
+    .filter((key) => !standardFields.includes(key))
+    .forEach((customKey) => {
+      // Only include custom fields with non-empty values
+      if (entry[customKey] && entry[customKey].toString().trim()) {
+        fields.push(
+          <p key={customKey}>
+            <strong>
+              {customKey
+                .replace(/([A-Z])/g, " $1")
+                .replace(/^./, (str) => str.toUpperCase())}:
+            </strong>{" "}
+            {entry[customKey]}
+          </p>
+        );
+      }
+    });
+
+  return fields;
+};
+
 
   return (
     <div className="vo-verification-dashboard">
@@ -699,28 +842,16 @@ const VerificationOfficerDashboard = () => {
                 </div>
               )}
 
-              {selectedStudent.application && (
-                <div className="vo-details-section">
-                  <h3>Payment Details</h3>
+              {selectedStudent.application ? (
+                <div className="vo-statement-box">
                   {selectedStudent.application.payment ? (
-                    <div className="vo-statement-box">
+                    <>
+                      <p><strong>Amount:</strong> ₹{selectedStudent.application.payment.amount || "N/A"}</p>
+                      <p><strong>Payment Method:</strong> {selectedStudent.application.payment.paymentMethod || "N/A"}</p>
+                      <p><strong>Payment Date:</strong> {selectedStudent.application.payment.paymentDate ? new Date(selectedStudent.application.payment.paymentDate).toLocaleDateString() : "N/A"}</p>
                       <p>
-                        <strong>Amount:</strong> ₹{selectedStudent.application.payment.amount || "N/A"}
-                      </p>
-                      <p>
-                        <strong>Payment Method:</strong>{" "}
-                        {selectedStudent.application.payment.paymentMethod || "N/A"}
-                      </p>
-                      <p>
-                        <strong>Payment Date:</strong>{" "}
-                        {selectedStudent.application.payment.paymentDate
-                          ? new Date(selectedStudent.application.payment.paymentDate).toLocaleDateString()
-                          : "N/A"}
-                      </p>
-                      <p>
-                        <strong>Status:</strong>{" "}
-                        {selectedStudent.application.payment.status || "N/A"}
-                        {selectedStudent.application.payment.status === "completed" ? (
+                        <strong>Status:</strong> {selectedStudent.application.payment.status || "N/A"}
+                        {checkboxes.payment !== undefined ? (
                           <>
                             <input
                               type="checkbox"
@@ -744,19 +875,46 @@ const VerificationOfficerDashboard = () => {
                             )}
                           </>
                         ) : (
-                          <span style={{ marginLeft: "10px", color: "var(--danger-color)" }}>
-                            (Verification blocked: Payment not completed)
+                          <span style={{ marginLeft: "10px", color: "var(--success-color)" }}>
+                            (Payment completed)
                           </span>
                         )}
                       </p>
-                    </div>
+                    </>
                   ) : (
-                    <div className="vo-error-message">
-                      No payment found. Verification is blocked until payment is completed.
-                    </div>
+                    <>
+                      <p><strong>Status:</strong> No payment found</p>
+                      <p>
+                        <input
+                          type="checkbox"
+                          checked={checkboxes.payment || false}
+                          onChange={() => handleCheckboxChange("payment")}
+                        />
+                        {!checkboxes.payment && (
+                          <input
+                            type="text"
+                            placeholder="Comment on payment"
+                            value={fieldComments.payment || ""}
+                            onChange={(e) => handleFieldCommentChange("payment", e.target.value)}
+                            style={{
+                              marginLeft: "10px",
+                              padding: "0.5rem",
+                              borderRadius: "4px",
+                              border: `1px solid var(--border-color)`,
+                              width: "200px",
+                            }}
+                          />
+                        )}
+                      </p>
+                    </>
                   )}
                 </div>
+              ) : (
+                <div className="vo-error-message">
+                  No payment information available.
+                </div>
               )}
+              
 
               {selectedStudent.application?.educationDetails && (
                 <div className="vo-details-section">
@@ -795,92 +953,7 @@ const VerificationOfficerDashboard = () => {
                           {selectedStudent.application.educationDetails[level].map(
                             (entry, index) => (
                               <div key={index} className="vo-statement-box">
-                                {level === "tenth" || level === "twelth" ? (
-                                  <>
-                                    <p>
-                                      <strong>School Name:</strong>{" "}
-                                      {entry.schoolName || "N/A"}
-                                    </p>
-                                    <p>
-                                      <strong>Board:</strong>{" "}
-                                      {entry.board || "N/A"}
-                                    </p>
-                                    <p>
-                                      <strong>Year of Passing:</strong>{" "}
-                                      {entry.yearOfPassing || entry.year || "N/A"}
-                                    </p>
-                                    <p>
-                                      <strong>Percentage:</strong>{" "}
-                                      {entry.percentage || "N/A"}
-                                    </p>
-                                    <p>
-                                      <strong>Subjects:</strong>{" "}
-                                      {entry.subjects || "N/A"}
-                                    </p>
-                                    {level === "twelth" && (
-                                      <p>
-                                        <strong>Stream:</strong>{" "}
-                                        {entry.stream || "N/A"}
-                                      </p>
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    <p>
-                                      <strong>College Name:</strong>{" "}
-                                      {entry.collegeName || "N/A"}
-                                    </p>
-                                    <p>
-                                      <strong>Degree:</strong>{" "}
-                                      {entry.degree || "N/A"}
-                                    </p>
-                                    <p>
-                                      <strong>Branch:</strong>{" "}
-                                      {entry.branch || "N/A"}
-                                    </p>
-                                    <p>
-                                      <strong>University:</strong>{" "}
-                                      {entry.university || "N/A"}
-                                    </p>
-                                    <p>
-                                      <strong>Year of Passing:</strong>{" "}
-                                      {entry.yearOfPassing || entry.year || "N/A"}
-                                    </p>
-                                    <p>
-                                      <strong>CGPA:</strong>{" "}
-                                      {entry.percentage || entry.cgpa || "N/A"}
-                                    </p>
-                                  </>
-                                )}
-                                {/* Render custom fields if any */}
-                                {Object.keys(entry)
-                                  .filter(
-                                    (key) =>
-                                      ![
-                                        "schoolName",
-                                        "board",
-                                        "yearOfPassing",
-                                        "year",
-                                        "percentage",
-                                        "subjects",
-                                        "stream",
-                                        "collegeName",
-                                        "degree",
-                                        "branch",
-                                        "university",
-                                        "cgpa",
-                                      ].includes(key)
-                                  )
-                                  .map((customKey) => (
-                                    <p key={customKey}>
-                                      <strong>
-                                        {customKey
-                                          .replace(/([A-Z])/g, " $1")
-                                          .replace(/^./, (str) => str.toUpperCase())}:
-                                      </strong>{" "}
-                                      {entry[customKey] || "N/A"}
-                                    </p>
-                                  ))}
+                                {renderAcademicEntryFields(level, entry)}
                               </div>
                             )
                           )}

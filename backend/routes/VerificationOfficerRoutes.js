@@ -186,11 +186,11 @@ router.post("/verify-application/:applicationId", auth, authorize(["verification
     application.studentId.verified = verified;
     application.studentId.verifiedBy = verified ? req.user.userId : null;
     await application.studentId.save();
-    
-    // Send email notification if application is verified
+
+    // Send email notification based on verification status
     if (verified) {
       const verificationDate = new Date().toLocaleString("en-US", {
-        timeZone: "Asia/Kolkata", // Adjust to your desired timezone
+        timeZone: "Asia/Kolkata",
         dateStyle: "medium",
         timeStyle: "medium",
       });
@@ -217,8 +217,53 @@ router.post("/verify-application/:applicationId", auth, authorize(["verification
           console.log("Verification email sent:", info.response);
         }
       });
-    }
+    } else {
+      const rejectionDate = new Date().toLocaleString("en-US", {
+        timeZone: "Asia/Kolkata",
+        dateStyle: "medium",
+        timeStyle: "medium",
+      });
+      const courseTitle = application.courseId?.title || "the course";
+      let fieldCommentsHtml = "";
+      if (fieldComments && Object.keys(fieldComments).length > 0) {
+        fieldCommentsHtml = `
+          <h3>Fields Requiring Attention:</h3>
+          <ul>
+            ${Object.entries(fieldComments)
+              .filter(([_, comment]) => comment.trim())
+              .map(([field, comment]) => `<li><strong>${field}:</strong> ${comment}</li>`)
+              .join("")}
+          </ul>
+        `;
+      }
+      const generalCommentsHtml = comments && comments.trim()
+        ? `<p><strong>General Comments:</strong> ${comments}</p>`
+        : "";
 
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: application.studentId.email,
+        subject: "Action Required: Your Application Needs Updates",
+        html: `
+          <h2>Dear ${application.studentId.name},</h2>
+          <p>We regret to inform you that your application for <strong>${courseTitle}</strong> was not verified as of <strong>${rejectionDate}</strong>.</p>
+          <p>Please address the issues below, update your application, and resubmit for further review:</p>
+          ${fieldCommentsHtml}
+          ${generalCommentsHtml}
+          <p>Log in to your account to make the necessary changes and resubmit your application.</p>
+          <p><strong>Best Regards,</strong></p>
+          <p><strong>Your Admission Team</strong></p>
+        `,
+      };
+
+      transporter.sendMail(mailOptions, (err, info) => {
+        if (err) {
+          console.error("Error sending rejection email:", err);
+        } else {
+          console.log("Rejection email sent:", info.response);
+        }
+      });
+    }
 
     res.json({ message: `Application ${verified ? "verified" : "rejected"} successfully` });
   } catch (error) {

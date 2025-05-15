@@ -15,6 +15,7 @@ const ApplicationFormSchema = new mongoose.Schema(
     formData: {
       type: mongoose.Schema.Types.Mixed,
       required: [true, "Form data is required"],
+      default: {}, // Default to empty object
       validate: {
         validator: function (v) {
           // Relax validation for draft forms

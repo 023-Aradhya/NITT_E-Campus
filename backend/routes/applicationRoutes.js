@@ -64,6 +64,31 @@ const handleMulterError = (err, req, res, next) => {
   next(err);
 };
 
+// Mark comments as read
+router.post(
+  "/mark-comments-read/:studentId/:courseId",
+  auth,
+  authorize(["student"]),
+  async (req, res) => {
+    try {
+      const { studentId, courseId } = req.params;
+      const application = await ApplicationForm.findOne({ studentId, courseId });
+      if (!application) {
+        return res.status(404).json({ message: "Application not found" });
+      }
+      if (application.status !== "rejected") {
+        return res.status(400).json({ message: "Comments can only be marked as read for rejected applications" });
+      }
+      application.commentsRead = true;
+      await application.save();
+      res.status(200).json({ message: "Comments marked as read" });
+    } catch (error) {
+      console.error("Error marking comments as read:", error);
+      res.status(500).json({ message: "Server error", error: error.message });
+    }
+  }
+);
+
 // Save draft application
 router.post(
   "/save-draft",
@@ -79,7 +104,7 @@ router.post(
       try {
         JSON.parse(value);
         return true;
-      } catch {
+      } catch (e) {
         throw new Error("Form data must be a valid JSON object");
       }
     }),
@@ -87,72 +112,111 @@ router.post(
       try {
         JSON.parse(value);
         return true;
-      } catch {
+      } catch (e) {
         throw new Error("Education details must be a valid JSON object");
       }
     }),
-    body("programType").isIn(["UG", "PG"]).withMessage("Program type must be UG or PG"),
     body("lastActiveSection").isInt({ min: 0 }).withMessage("Last active section must be a non-negative integer"),
+    body("programType").isIn(["UG", "PG"]).optional().withMessage("Program type must be UG or PG"),
   ],
   async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        console.error("Validation errors:", errors.array());
+        return res.status(400).json({ message: "Validation failed", errors: errors.array() });
       }
 
-      const { courseId, studentId, programType, lastActiveSection } = req.body;
-      const formData = JSON.parse(req.body.formData);
-      const educationDetails = JSON.parse(req.body.educationDetails);
+      const { courseId, studentId, lastActiveSection, programType } = req.body;
+      let formData, educationDetails;
+      try {
+        formData = JSON.parse(req.body.formData);
+        educationDetails = JSON.parse(req.body.educationDetails);
+      } catch (e) {
+        console.error("JSON parsing error:", e);
+        return res.status(400).json({ message: "Invalid JSON in formData or educationDetails" });
+      }
 
-      // Check if the course exists
+      // Validate course existence
       const course = await Course.findById(courseId);
       if (!course) {
+        console.error("Course not found for courseId:", courseId);
         return res.status(404).json({ message: "Course not found" });
       }
 
-      // Process uploaded files (if any)
-      let documents = [];
-      if (req.files && req.files.length > 0) {
-        documents = req.files.map((file, index) => {
-          if (!formData.documents[index]?.type) {
-            throw new Error(`Document type missing for file at index ${index}`);
+      console.log("Saving draft with status:", req.body.status);
+      console.log("FormData:", formData);
+      console.log("EducationDetails:", educationDetails);
+      console.log("ProgramType:", programType);
+
+      let application = await ApplicationForm.findOne({ studentId, courseId });
+
+      if (application && application.status === "verified") {
+        return res.status(400).json({ message: "Cannot save draft for verified application" });
+      }
+
+      // Merge new uploads with existing documents
+      const documents = [];
+      const existingDocs = application?.formData?.documents || [];
+      
+      console.log("Received formData.documents:", formData.documents);
+      if (formData.documents && Array.isArray(formData.documents)) {
+        formData.documents.forEach((doc, index) => {
+          // Check for new file upload
+          const file = req.files?.find(f => f.fieldname === "documents" && (!doc.originalName || f.originalname === doc.originalName));
+          if (file) {
+            // New file uploaded
+            documents.push({
+              type: doc.type,
+              filename: file.filename,
+              path: file.path,
+              originalName: file.originalname,
+              mimetype: file.mimetype,
+              size: file.size,
+            });
+          } else if (doc.filename && doc.path && doc.type) {
+            // Preserve existing document
+            const existingDoc = existingDocs.find(d => d.filename === doc.filename && d.path === doc.path && d.type === doc.type);
+            if (existingDoc) {
+              documents.push({
+                type: doc.type,
+                filename: doc.filename,
+                path: doc.path,
+                originalName: doc.originalName,
+                mimetype: doc.mimetype,
+                size: doc.size,
+              });
+            }
+          } else if (doc.type) {
+            // Document placeholder without file
+            documents.push({ type: doc.type });
           }
-          return {
-            type: formData.documents[index].type,
-            filename: file.filename,
-            path: file.path,
-            originalName: file.originalname,
-            mimetype: file.mimetype,
-            size: file.size,
-          };
         });
       }
+
       formData.documents = documents;
 
-      // Check for existing draft or submitted application
-      let application = await ApplicationForm.findOne({ studentId, courseId });
-      if (application && application.status !== "draft") {
-        return res.status(400).json({ message: "An application for this course has already been submitted" });
-      }
+      // Use course.programType if programType is not provided
+      const effectiveProgramType = programType || course.programType || "PG";
 
       if (application) {
-        // Update existing draft
+        // Update existing application (draft or rejected)
         application.formData = formData;
         application.educationDetails = educationDetails;
-        application.programType = programType;
         application.lastActiveSection = lastActiveSection;
         application.status = "draft";
-      }  else {
-        // Create new draft
+        application.programType = effectiveProgramType;
+        // Preserve fieldComments
+      } else {
+        // Create new application
         application = new ApplicationForm({
           courseId,
           studentId,
           formData,
           educationDetails,
-          programType,
           lastActiveSection,
           status: "draft",
+          programType: effectiveProgramType,
         });
       }
 
@@ -162,6 +226,14 @@ router.post(
       console.error("Error saving draft:", error);
       if (error instanceof multer.MulterError) {
         return res.status(400).json({ message: `File upload error: ${error.message}` });
+      }
+      if (error.name === "ValidationError") {
+        const validationErrors = Object.values(error.errors).map((err) => ({
+          field: err.path,
+          message: err.message,
+        }));
+        console.error("MongoDB validation errors:", validationErrors);
+        return res.status(400).json({ message: "MongoDB validation error", errors: validationErrors });
       }
       res.status(500).json({ message: "Server error", error: error.message });
     }
@@ -173,9 +245,9 @@ router.post(
   "/submit-application",
   auth,
   authorize(["student"]),
-  dynamicUpload, // Use dynamic upload middleware
-  handleMulterError, // Handle Multer errors
-  logRequest, // Log request details
+  dynamicUpload,
+  handleMulterError,
+  logRequest,
   [
     body("courseId").notEmpty().withMessage("Course ID is required"),
     body("studentId").notEmpty().withMessage("Student ID is required"),
@@ -214,7 +286,6 @@ router.post(
       const formData = JSON.parse(req.body.formData);
       const educationDetails = JSON.parse(req.body.educationDetails);
 
-      // Additional checks for aadhaarNumber and email
       if (!formData.aadhaarNumber || !/^\d{12}$/.test(formData.aadhaarNumber)) {
         return res.status(400).json({ message: "Valid 12-digit Aadhaar number is required" });
       }
@@ -222,54 +293,101 @@ router.post(
         return res.status(400).json({ message: "Valid email is required" });
       }
 
-      // Check if the course exists
       const course = await Course.findById(courseId);
       if (!course) {
         return res.status(404).json({ message: "Course not found" });
       }
 
-      // Process uploaded files
-      if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ message: "No files uploaded" });
+      // Check for document-related comments in existing application
+      let hasDocumentComments = false;
+      let application = await ApplicationForm.findOne({ studentId, courseId });
+      if (application && application.fieldComments) {
+        hasDocumentComments = Array.from(application.fieldComments.keys()).some(
+          (key) => key.startsWith("document_") || key === "documents"
+        );
       }
-      if (!formData.documents || !Array.isArray(formData.documents)) {
-        return res.status(400).json({ message: "Documents array is missing or invalid" });
-      }
-      if (req.files.length !== formData.documents.length) {
-        return res.status(400).json({
-          message: `Expected ${formData.documents.length} files, but received ${req.files.length}`,
+
+      // Merge new uploads with existing documents
+      const documents = [];
+      let fileIndex = 0; // Track req.files index
+
+      console.log("Received formData.documents:", formData.documents);
+      if (formData.documents && Array.isArray(formData.documents)) {
+        formData.documents.forEach((doc) => {
+          if (doc.filename && doc.path && doc.type) {
+            // Preserve existing document
+            documents.push({
+              type: doc.type,
+              filename: doc.filename,
+              path: doc.path,
+              originalName: doc.originalName,
+              mimetype: doc.mimetype,
+              size: doc.size,
+            });
+          } else if (doc.type && fileIndex < (req.files?.length || 0)) {
+            // New file upload
+            const file = req.files[fileIndex];
+            documents.push({
+              type: doc.type,
+              filename: file.filename,
+              path: file.path,
+              originalName: file.originalname,
+              mimetype: file.mimetype,
+              size: file.size,
+            });
+            fileIndex++;
+          }
         });
       }
 
-      const documents = req.files.map((file, index) => {
-        if (!formData.documents[index]?.type) {
-          throw new Error(`Document type missing for file at index ${index}`);
-        }
-        return {
-          type: formData.documents[index].type,
-          filename: file.filename,
-          path: file.path,
-          originalName: file.originalname,
-          mimetype: file.mimetype,
-          size: file.size,
-        };
-      });
+      // Validate commented documents
+      if (hasDocumentComments) {
+        const commentedDocIndices = Array.from(application.fieldComments.keys())
+          .filter((key) => key.startsWith("document_"))
+          .map((key) => parseInt(key.replace("document_", ""), 10));
+        const commentedDocTypes = commentedDocIndices
+          .map((index) => application.formData.documents[index]?.type)
+          .filter(Boolean);
 
+        console.log("Commented doc types:", commentedDocTypes);
+        console.log("Documents:", documents);
+
+        const missingCommentedDocs = commentedDocTypes.filter(
+          (docType) => !documents.some((doc) => doc.type === docType)
+        );
+
+        if (missingCommentedDocs.length > 0) {
+          return res.status(400).json({
+            message: `Missing documents for: ${missingCommentedDocs.join(", ")}`,
+          });
+        }
+
+        if (
+          application.fieldComments.has("documents") &&
+          documents.length === 0
+        ) {
+          return res.status(400).json({
+            message: "Please upload at least one document due to general document comments.",
+          });
+        }
+      }
+
+      console.log("Final documents saved:", documents);
       formData.documents = documents;
 
-      // Check for existing application
-      let application = await ApplicationForm.findOne({ studentId, courseId });
-      if (application && application.status !== "draft") {
-        return res.status(400).json({ message: "An application for this course has already been submitted" });
+      if (application && application.status === "verified") {
+        return res.status(400).json({ message: "Application has already been verified" });
       }
 
       if (application) {
-        // Update existing draft to submitted
+        // Update existing application (draft or rejected)
         application.formData = formData;
         application.educationDetails = educationDetails;
         application.programType = programType;
         application.status = "pending";
-        application.lastActiveSection = 0; // Reset on submission
+        application.lastActiveSection = 0;
+        application.fieldComments = {}; // Clear comments on resubmission
+        application.commentsRead = false;
       } else {
         // Create new application
         application = new ApplicationForm({
@@ -290,8 +408,18 @@ router.post(
         return res.status(400).json({ message: `File upload error: ${error.message}` });
       }
       if (error.name === "ValidationError") {
-        const validationErrors = Object.values(error.errors).map((err) => err.message);
-        return res.status(400).json({ message: "Validation error", errors: validationErrors });
+        const validationErrors = Object.values(error.errors).map((err) => ({
+          field: err.path,
+          message: err.message,
+        }));
+        const filteredComments = validationErrors.reduce((acc, err) => {
+          if (err.message.trim()) {
+            acc[err.field] = err.message;
+          }
+          return acc;
+        }, {});
+        console.error("MongoDB validation errors:", filteredComments);
+        return res.status(400).json({ message: "Validation error", errors: filteredComments });
       }
       res.status(500).json({ message: "Server error", error: error.message });
     }
