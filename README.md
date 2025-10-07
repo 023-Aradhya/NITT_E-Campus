@@ -10,11 +10,10 @@ NIT Trichy Ecampus is a web-based platform built using the MERN (MongoDB, Expres
 - **Homepage**: A landing page with information about the platform.
 
 ## Technologies Used
-- **Frontend**: React.js (with Redux for state management)
+- **Frontend**: React.js (with ContextAPI for state management)
 - **Backend**: Node.js and Express.js
 - **Database**: MongoDB (with Mongoose ORM)
 - **Authentication**: JSON Web Tokens (JWT)
-- **Styling**: Tailwind CSS / Material-UI (optional)
 
 ## Installation
 ### Prerequisites
@@ -25,7 +24,7 @@ Ensure you have the following installed:
 ### Steps
 1. Clone the repository:
    ```sh
-   (https://github.com/067prabhat/NITT_M-tech.git)
+   (https://github.com/023-Aradhya/NITT_E-Campus.git)
    cd NIT-Trichy
    ```
 2. Install dependencies:
